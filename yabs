@@ -1,0 +1,298 @@
+#!/usr/bin/env ruby
+# # YABS
+#
+# ## Features
+#
+# ### What I need:
+#
+# * List what folders of this machine will be saved and where
+# * Backup the folders on a regular schedule
+# * Show the last backup information (date)
+# * Show the content of a backup
+# * Restore a full backup
+#
+# ### Nice to have
+#
+# * Find a file through all backup versions
+# * Restore a single file
+# * List/restore what is saved on the server
+#
+# ## Installation
+#
+# https://www.digitalocean.com/community/tutorials/how-to-use-duplicity-with-gpg-to-securely-automate-backups-on-ubuntu
+#
+# ## Todo list
+#
+# TODO: Manage the GPG key option
+
+require 'rubygems'
+require 'bundler/setup'
+require 'table_print'
+require 'time'
+require 'yaml'
+require_relative 'console_app'
+
+module Duplicity
+  BINARY = 'duplicity'.freeze
+
+  def self.verbose
+    true
+  end
+
+  def self.passphrase_path=(path)
+    @passphrase_path = path
+  end
+
+  def self.passphrase_path
+    @passphrase_path
+  end
+
+  def self.run(*args)
+    command = escape([BINARY] + args).join(' ')
+    puts '--- ' + command if verbose
+    r = run_command_with_passphrase(command)
+    log_result(r) if verbose
+    r.stdout
+  end
+
+  def self.escape(words)
+    words.map { |w| Shellwords.escape(w) }
+  end
+
+  def self.passphrase
+    Shellwords.escape(File.read(passphrase_path))
+  end
+
+  def self.run_command_with_passphrase(command)
+    command = "PASSPHRASE=#{passphrase} #{command}"
+    Command.run(command)
+  end
+
+  def self.log_result(result)
+    puts '=== out'
+    puts result.stdout
+    puts '--- err'
+    puts result.stderr
+    puts '--- status'
+    puts result.status
+    puts '==='
+  end
+end
+
+class PackageVersion
+  attr_reader :type, :timestamp, :index
+
+  def self.parse(row, index)
+    parts = row.split(/ +/)
+    parts.shift if parts.first == ''
+    type = parts[0]
+    parts.pop # Nb volumes
+    time = parts.join(' ')
+    timestamp = Time.parse(time)
+    new index, type, timestamp
+  end
+
+  def self.blank
+    new '-', '-', 'Never'
+  end
+
+  def initialize(index, type, timestamp)
+    @index = index
+    @type = type
+    @timestamp = timestamp
+  end
+end
+
+class Package
+  # duplicity -t '2016-03-15T11:38:17' --file-to-restore toto.txt scp://boneandbrain.org/tmp/backup tutu.txt
+
+  attr_reader :directory
+
+  def initialize(directory, remote)
+    @encrypt_key = '8D5814C8'
+    @directory = directory
+    @remote = remote
+  end
+
+  # type may be full or incremental
+  def backup(type = 'incremental')
+    duplicity type, '--encrypt-key', @encrypt_key, @directory, @remote
+  end
+
+  def restore(destination)
+    duplicity 'restore', @remote, destination
+  end
+
+  def versions
+    versions = []
+    output = duplicity('collection-status', @remote)
+    i = 0
+    output.each_line do |line|
+      next unless line =~ /^ *(Full|Incremental)/
+      versions << PackageVersion.parse(line, i)
+      i = i.next
+    end
+    versions
+  end
+
+  def version(version_index)
+    all_versions = versions
+    if all_versions.respond_to?(version_index)
+      all_versions.send(version_index)
+    else
+      all_versions[version_index]
+    end
+  end
+
+  def content(version_index)
+    v = version(version_index)
+    duplicity 'list-current-files',
+              '-t', v.timestamp.strftime('%Y-%m-%dT%H:%M:%S'),
+              @remote
+  end
+
+  private
+
+  def duplicity(*args)
+    Duplicity.run(*args)
+  end
+end
+
+module Yabs
+  class Application < ConsoleApp::Application
+
+    PASSPHRASE_HINT = "Yabs needs a duplicity GPG signature passphrase file to "\
+                      "work properly.\n\n"\
+                      "Please create an hidden file with your gpg key "\
+                      "passphrase.\n\n"\
+                      "     echo 'My Passphrase' > "\
+                      "%{file_path}\n"\
+                      "     chmod 600 %{file_path}"
+
+    # TODO: Makes this better
+    CONFIG_HINT = "Please create the configuration file"
+
+    def setup
+      # Yabs won't do anything without a bit of config
+      create_config_dir!
+      ensure_passphrase_file
+      ensure_config_file
+      init_duplicity
+    end
+
+    def ensure_passphrase_file
+      return if File.exists?(config_file('passphrase'))
+      puts PASSPHRASE_HINT.gsub('%{file_path}', config_file('passphrase'))
+      raise ApplicationExit
+    end
+
+    def ensure_config_file
+      return if File.exists?(config_file('config.yml'))
+      puts CONFIG_HINT
+      raise ApplicationExit
+    end
+
+    def init_duplicity
+      Duplicity.passphrase_path = config_file('passphrase')
+    end
+
+    def run!
+      setup
+    end
+  end
+end
+
+application = Yabs::Application.new('yabs')
+exit application.run
+
+config = YAML.load_file(application.config_file('config.yml'))
+
+directories = config['directories']
+
+vault = "#{config['vault']['scheme']}#{config['vault']['path']}"
+
+hostname = `hostname`.chomp
+
+@packages = directories.map do |directory|
+  remote = File.join(vault, hostname, directory)
+  Package.new directory, remote
+end
+
+def find_package(directory)
+  directory = File.expand_path(directory)
+  @packages.detect { |p| p.directory == directory }.tap do |package|
+    fail "No package found for '#{directory}'" unless package
+  end
+end
+
+case ARGV.first
+when 'restore'
+  package = find_package(ARGV[1] || '.')
+  fail 'You must provide a destination' unless ARGV[2]
+  destination = File.expand_path(ARGV[2])
+
+  puts "Restore #{package.directory} from #{vault} to #{destination} (y/N)?"
+  char = $stdin.gets.chomp
+  unless char.casecmp('y').zero?
+    puts 'Cancelling...'
+    exit
+  end
+  puts 'Restoring...'
+  package.restore(destination)
+  puts 'Backup restored'
+when 'log'
+  package = find_package(ARGV[1] || '.')
+
+  puts "Package versions for #{package.directory} on #{vault}"
+  puts
+  package.versions.each do |version|
+    puts "[#{version.index}] #{version.timestamp} (#{version.type})"
+  end
+when 'show'
+  package = find_package(ARGV[1] || '.')
+  version = package.version(:last)
+
+  puts "Package content for #{package.directory} on #{vault} (version: "\
+       "#{version.index})"
+  puts
+  puts package.content(:last)
+when 'backup'
+  # TODO: First backup should always be full
+  # Backup all local packages
+  @packages.each do |p|
+    puts "- #{p.directory}"
+  end
+  puts
+  puts "Backup those packages to #{vault} (y/N)?"
+  char = $stdin.gets.chomp
+  unless char.casecmp('y').zero?
+    puts 'Cancelling...'
+    exit
+  end
+  puts 'Backuping...'
+  @packages.each do |p|
+    puts "#{p.directory}..."
+    p.backup # 'full'
+  end
+  puts 'Backup completed'
+when 'index', nil
+  # TODO: This seems to create distant folder (which are useless)
+  # List all local packages
+  puts 'Local packages'
+  puts
+  puts "Backup store: #{vault}"
+  puts
+  content = @packages.map do |p|
+    v = p.version(:last) || PackageVersion.blank
+    {
+      folder: p.directory,
+      version: v.index,
+      last_backup: v.timestamp
+    }
+  end
+  tp content
+  puts
+  puts 'Hint: Version numbering starts at 0.'
+else
+  puts "Command not recognized: #{ARGV.first}"
+end
