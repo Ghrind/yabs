@@ -6,7 +6,7 @@ module Duplicity
   BINARY = 'duplicity'.freeze
 
   def self.verbose
-    true
+    false
   end
 
   def self.passphrase_path=(path)

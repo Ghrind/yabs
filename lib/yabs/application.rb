@@ -14,6 +14,41 @@ module Yabs
     # TODO: Makes this better
     CONFIG_HINT = 'Please create the configuration file'.freeze
 
+    # log: 'ShowDirectoryHistory',
+    # show: 'ShowDirectoryContent'
+
+    DEFAULT_ACTION = 'index'.freeze
+
+    def config
+      @_config ||= YAML.load_file(config_file('config.yml'))
+    end
+
+    def directories
+      config['directories']
+    end
+
+    def vault
+      "#{config['vault']['scheme']}#{config['vault']['path']}"
+    end
+
+    def hostname
+      @_hostname ||= `hostname`.chomp
+    end
+
+    def find_package(directory)
+      directory = File.expand_path(directory)
+      packages.detect { |p| p.directory == directory }.tap do |package|
+        fail "No package found for '#{directory}'" unless package
+      end
+    end
+
+    def packages
+      @_packages ||= directories.map do |directory|
+        remote = File.join(vault, hostname, directory)
+        Yabs::Package.new directory, remote
+      end
+    end
+
     def setup
       # Yabs won't do anything without a bit of config
       create_config_dir!
@@ -40,6 +75,31 @@ module Yabs
 
     def run!
       setup
+      run_action @args.first
+    end
+
+    def run_action(action_name)
+      case (action_name || DEFAULT_ACTION)
+      when 'restore'
+        package = find_package(@args[1] || '.')
+        fail 'You must provide a destination' unless @args[2]
+        destination = File.expand_path(@args[2])
+        Commands::RestoreDirectory.run vault, package, destination
+      when 'log'
+        package = find_package(@args[1] || '.')
+        Commands::ShowDirectoryHistory.run vault, package
+      when 'show'
+        package = find_package(@args[1] || '.')
+        Commands::ShowDirectoryContent.run vault, package
+      when 'backup'
+        # TODO: First backup should always be full
+        type = @args[1]
+        Commands::BackupAllDirectories.run vault, packages, type
+      when 'index'
+        Commands::ShowIndex.run vault, packages
+      else
+        puts "Command not recognized: #{action_name}"
+      end
     end
   end
 end
