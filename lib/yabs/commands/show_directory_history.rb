@@ -1,10 +1,6 @@
 module Yabs
   module Commands
-    class ShowDirectoryHistory
-      def self.run(vault, package)
-        new(vault, package).run!
-      end
-
+    class ShowDirectoryHistory < ConsoleApp::Action
       def initialize(vault, package)
         @vault = vault
         @package = package

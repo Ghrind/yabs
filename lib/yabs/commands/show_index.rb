@@ -1,10 +1,6 @@
 module Yabs
   module Commands
-    class ShowIndex
-      def self.run(vault, packages)
-        new(vault, packages).run!
-      end
-
+    class ShowIndex < ConsoleApp::Action
       def initialize(vault, packages)
         @vault = vault
         @packages = packages

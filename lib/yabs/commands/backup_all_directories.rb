@@ -1,10 +1,7 @@
 module Yabs
   module Commands
-    class BackupAllDirectories
-      def self.run(vault, packages, type)
-        new(vault, packages, type).run!
-      end
-
+    # Backup all local packages
+    class BackupAllDirectories < ConsoleApp::Action
       def initialize(vault, packages, type)
         @vault = vault
         @packages = packages
@@ -12,17 +9,12 @@ module Yabs
       end
 
       def run!
-        # Backup all local packages
         @packages.each do |p|
           puts "- #{p.directory}"
         end
         puts
-        puts "Backup those packages to #{@vault} (y/N)?"
-        char = $stdin.gets.chomp
-        unless char.casecmp('y').zero?
-          puts 'Cancelling...'
-          exit
-        end
+        validate "Backup those packages to #{@vault}?"
+
         puts 'Backuping...'
         @packages.each do |p|
           puts "#{p.directory}..."

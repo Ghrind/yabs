@@ -2,7 +2,6 @@
 
 require 'rubygems'
 require 'bundler/setup'
-require 'table_print' # TODO: Should be required in another file
 require_relative 'lib/yabs'
 
 application = Yabs::Application.new('yabs')

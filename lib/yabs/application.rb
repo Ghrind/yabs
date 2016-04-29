@@ -60,13 +60,13 @@ module Yabs
     def ensure_passphrase_file
       return if File.exist?(config_file('passphrase'))
       puts PASSPHRASE_HINT.gsub('%{file_path}', config_file('passphrase'))
-      fail ApplicationExit
+      fail BadConfigurationError
     end
 
     def ensure_config_file
       return if File.exist?(config_file('config.yml'))
       puts CONFIG_HINT
-      fail ApplicationExit
+      fail BadConfigurationError
     end
 
     def init_duplicity

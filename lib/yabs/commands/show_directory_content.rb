@@ -1,10 +1,6 @@
 module Yabs
   module Commands
-    class ShowDirectoryContent
-      def self.run(vault, package)
-        new(vault, package).run!
-      end
-
+    class ShowDirectoryContent < ConsoleApp::Action
       def initialize(vault, package)
         @vault = vault
         @package = package

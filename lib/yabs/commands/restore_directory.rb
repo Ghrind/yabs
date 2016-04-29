@@ -1,10 +1,6 @@
 module Yabs
   module Commands
-    class RestoreDirectory
-      def self.run(vault, package, destination)
-        new(vault, package, destination).run!
-      end
-
+    class RestoreDirectory < ConsoleApp::Action
       def initialize(vault, package, destination)
         @vault = vault
         @package = package
@@ -12,12 +8,7 @@ module Yabs
       end
 
       def run!
-        puts "Restore #{@package.directory} from #{@vault} to #{@destination} (y/N)?"
-        char = $stdin.gets.chomp
-        unless char.casecmp('y').zero?
-          puts 'Cancelling...'
-          exit
-        end
+        validate "Restore #{@package.directory} from #{@vault} to #{@destination} (y/N)?"
         puts 'Restoring...'
         @package.restore(@destination)
         puts 'Backup restored'

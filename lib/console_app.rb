@@ -1,11 +1,15 @@
 require 'fileutils'
+require 'table_print'
 
 module ConsoleApp
+  class OperationCancelled < StandardError
+  end
+
+  class BadConfigurationError < StandardError
+  end
+
   # A generic console application
   class Application
-    class ApplicationExit < StandardError
-    end
-
     attr_reader :name
 
     def initialize(name)
@@ -16,12 +20,14 @@ module ConsoleApp
       @args = args
       run!
       0
-    rescue ApplicationExit
+    rescue BadConfigurationError
       1
+    rescue OperationCancelled
+      0
     end
 
     def run!
-      fail 'Override this method with your application setup'
+      fail 'Override this method with your application logic'
     end
 
     def config_file(*args)
@@ -38,6 +44,29 @@ module ConsoleApp
 
     def create_config_dir!
       FileUtils.mkdir_p(config_dir)
+    end
+  end
+
+  class Action
+    def self.run(*args)
+      new(*args).run!
+    end
+
+    def run!
+      fail 'Override this method with your action logic'
+    end
+
+    def prompt_yes_no?(message)
+      puts "#{message} (y/N)"
+      char = $stdin.gets.chomp
+      char.casecmp('y').zero?
+    end
+
+    def validate(message)
+      unless prompt_yes_no?(message)
+        puts 'Cancelling...'
+        fail OperationCancelled
+      end
     end
   end
 end
