@@ -1,6 +1,46 @@
 require 'yaml'
 
 module Yabs
+  class Commands < ConsoleApp::Commands
+    default_task :index
+
+    desc 'index', 'List all packages in the current vault'
+    def index
+      ShowIndex.run app.vault, app.packages
+    end
+
+    desc 'log', 'Show the versions history of a single package'
+    method_option :package, aliases: %w(-p), type: :string, default: '.'
+    def log
+      package = app.find_package(options[:package])
+      ShowDirectoryHistory.run app.vault, package
+    end
+
+    desc 'show', 'List all files of the last version of a package'
+    method_option :package, aliases: %w(-p), type: :string, default: '.'
+    def show
+      package = app.find_package(options[:package])
+      ShowDirectoryContent.run app.vault, package
+    end
+
+    desc 'restore', 'Restore a whole package to the specified directory'
+    method_option :package, aliases: %w(-p), type: :string, default: '.'
+    method_option :destination, aliases: %w(-d), type: :string, required: true
+    def restore
+      package = app.find_package(options[:package])
+      destination = File.expand_path(options[:destination])
+      RestoreDirectory.run app.vault, package, destination
+    end
+
+    desc 'backup', 'Backup all packages to the vault'
+    method_option :incremental, aliases: %w(-i), type: :boolean
+    def backup
+      # TODO: First backup should always be full
+      type = options[:incremental] ? :incremental : :full
+      BackupAllDirectories.run app.vault, app.packages, type
+    end
+  end
+
   # The yabs console application
   class Application < ConsoleApp::Application
     PASSPHRASE_HINT = 'Yabs needs a duplicity GPG signature passphrase file to'\
@@ -14,21 +54,8 @@ module Yabs
     # TODO: Makes this better
     CONFIG_HINT = 'Please create the configuration file'.freeze
 
-    # log: 'ShowDirectoryHistory',
-    # show: 'ShowDirectoryContent'
-
-    DEFAULT_ACTION = 'index'.freeze
-
-    def config
-      @_config ||= YAML.load_file(config_file('config.yml'))
-    end
-
     def directories
       config['directories']
-    end
-
-    def vault
-      "#{config['vault']['scheme']}#{config['vault']['path']}"
     end
 
     def hostname
@@ -40,6 +67,10 @@ module Yabs
       packages.detect { |p| p.directory == directory }.tap do |package|
         fail "No package found for '#{directory}'" unless package
       end
+    end
+
+    def vault
+      "#{config['vault']['scheme']}#{config['vault']['path']}"
     end
 
     def packages
@@ -60,46 +91,17 @@ module Yabs
     def ensure_passphrase_file
       return if File.exist?(config_file('passphrase'))
       puts PASSPHRASE_HINT.gsub('%{file_path}', config_file('passphrase'))
-      fail BadConfigurationError
+      fail ConsoleApp::BadConfigurationError
     end
 
     def ensure_config_file
       return if File.exist?(config_file('config.yml'))
       puts CONFIG_HINT
-      fail BadConfigurationError
+      fail ConsoleApp::BadConfigurationError
     end
 
     def init_duplicity
       Duplicity.passphrase_path = config_file('passphrase')
-    end
-
-    def run!
-      setup
-      run_action @args.first
-    end
-
-    def run_action(action_name)
-      case (action_name || DEFAULT_ACTION)
-      when 'restore'
-        package = find_package(@args[1] || '.')
-        fail 'You must provide a destination' unless @args[2]
-        destination = File.expand_path(@args[2])
-        Commands::RestoreDirectory.run vault, package, destination
-      when 'log'
-        package = find_package(@args[1] || '.')
-        Commands::ShowDirectoryHistory.run vault, package
-      when 'show'
-        package = find_package(@args[1] || '.')
-        Commands::ShowDirectoryContent.run vault, package
-      when 'backup'
-        # TODO: First backup should always be full
-        type = @args[1]
-        Commands::BackupAllDirectories.run vault, packages, type
-      when 'index'
-        Commands::ShowIndex.run vault, packages
-      else
-        puts "Command not recognized: #{action_name}"
-      end
     end
   end
 end

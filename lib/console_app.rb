@@ -1,5 +1,7 @@
 require 'fileutils'
 require 'table_print'
+require 'optparse'
+require 'thor'
 
 module ConsoleApp
   class OperationCancelled < StandardError
@@ -8,17 +10,33 @@ module ConsoleApp
   class BadConfigurationError < StandardError
   end
 
+  class Commands < Thor
+    def self.application=(app)
+      @application = app
+    end
+
+    def self.application
+      @application
+    end
+    private
+
+    def app
+      self.class.application
+    end
+  end
+
   # A generic console application
   class Application
-    attr_reader :name
+    attr_reader :name, :version
 
-    def initialize(name)
+    def initialize(name = 'console-app', version = '0.1.0')
       @name = name
+      @version = version
     end
 
     def run(args)
-      @args = args
-      run!
+      setup
+      commands.start args, config
       0
     rescue BadConfigurationError
       1
@@ -26,8 +44,17 @@ module ConsoleApp
       0
     end
 
-    def run!
-      fail 'Override this method with your application logic'
+    def commands
+      return @_commands if @_commands
+      commands_name = self.class.name.split('::')
+      commands_name[-1] = 'Commands'
+      @_commands = Kernel.const_get(commands_name.join('::'))
+      @_commands.application = self
+      @_commands
+    end
+
+    def config
+      @_config ||= YAML.load_file(config_file('config.yml'))
     end
 
     def config_file(*args)
@@ -39,7 +66,7 @@ module ConsoleApp
     end
 
     def setup
-      fail 'Override this method with your application setup'
+      # Override this method with your application setup
     end
 
     def create_config_dir!
@@ -47,14 +74,21 @@ module ConsoleApp
     end
   end
 
-  class Action
+  class Command
     def self.run(*args)
       new(*args).run!
+    end
+
+    def initialize(*args)
+      @args = args
+      parse_options!
     end
 
     def run!
       fail 'Override this method with your action logic'
     end
+
+    private
 
     def prompt_yes_no?(message)
       puts "#{message} (y/N)"

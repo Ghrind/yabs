@@ -18,4 +18,21 @@
 
 ## Installation
 
+### Requiremnents
+
+* duplicity
+* python-paramiko (for ssh backup)
+
+### Steps
+
+* Install yabs
+* Generate a GPG key (or use an existing one)
+* Add the config file
+* Make sure duplicity can connect through ssh (if needed)
+
+## TODO
+
+* Manage errors when duplicity command fails
+
+
 https://www.digitalocean.com/community/tutorials/how-to-use-duplicity-with-gpg-to-securely-automate-backups-on-ubuntu
