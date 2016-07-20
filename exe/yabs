@@ -2,7 +2,7 @@
 
 require 'rubygems'
 require 'bundler/setup'
-require_relative 'lib/yabs'
+require 'yabs'
 
 application = Yabs::Application.new('yabs')
 exit application.run(ARGV)

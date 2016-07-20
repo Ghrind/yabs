@@ -1,6 +1,4 @@
 source 'https://rubygems.org'
 
-# gem 'filesize'
-gem 'table_print'
-gem 'command'
-gem 'thor'
+# Specify your gem's dependencies in yabs.gemspec
+gemspec
