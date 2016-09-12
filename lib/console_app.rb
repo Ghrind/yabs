@@ -1,6 +1,5 @@
 require 'fileutils'
 require 'table_print'
-require 'optparse'
 require 'thor'
 
 module ConsoleApp
@@ -18,6 +17,7 @@ module ConsoleApp
     def self.application
       @application
     end
+
     private
 
     def app

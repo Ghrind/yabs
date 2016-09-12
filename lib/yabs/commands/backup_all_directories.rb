@@ -4,7 +4,7 @@ module Yabs
     def initialize(vault, packages, type)
       @vault = vault
       @packages = packages
-      @type = type
+      @type = type || 'incremental'
     end
 
     def run!
@@ -12,9 +12,9 @@ module Yabs
         puts "- #{p.directory}"
       end
       puts
-      validate "Backup those packages to #{@vault}?"
+      validate "Backup (#{@type}) those packages to #{@vault}?"
 
-      puts 'Backuping...'
+      puts "Backuping (#{@type})..."
       @packages.each do |p|
         puts "#{p.directory}..."
         p.backup @type
