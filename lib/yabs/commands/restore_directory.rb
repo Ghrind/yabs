@@ -1,15 +1,17 @@
 module Yabs
-  class RestoreDirectory < ConsoleApp::Command
-    def initialize(vault, package, destination)
+  class RestorePath < ConsoleApp::Command
+    def initialize(vault, package, destination, options = {})
+      @path = options[:path]
       @vault = vault
       @package = package
       @destination = destination
     end
 
     def run!
-      validate "Restore #{@package.directory} from #{@vault} to #{@destination} (y/N)?"
+      # TODO: manage destination properly
+      validate "Restore #{@path} from #{File.join(@package.directory)} to #{@destination}?"
       puts 'Restoring...'
-      @package.restore(@destination)
+      @package.restore(@destination, path: @path)
       puts 'Backup restored'
     end
   end

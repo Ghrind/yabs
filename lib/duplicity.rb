@@ -3,6 +3,10 @@ require 'command'
 
 # A wrapper arround the duplicity binary
 module Duplicity
+
+  class DuplicityError < RuntimeError
+  end
+
   BINARY = 'duplicity'.freeze
 
   def self.verbose
@@ -22,6 +26,7 @@ module Duplicity
     puts '--- ' + command if verbose
     r = run_command_with_passphrase(command)
     log_result(r) if verbose
+    raise DuplicityError, r.stderr unless r.status.zero?
     r.stdout
   end
 

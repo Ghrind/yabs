@@ -27,10 +27,11 @@ module Yabs
     desc 'restore', 'Restore a whole package to the specified directory'
     method_option :package, aliases: %w(-p), type: :string, default: '.'
     method_option :destination, aliases: %w(-d), type: :string, required: true
+    method_option :path, aliases: %w(-P), type: :string
     def restore
       package = app.find_package(options[:package])
       destination = File.expand_path(options[:destination])
-      RestoreDirectory.run app.vault, package, destination
+      RestorePath.run app.vault, package, destination, path: options[:path]
     end
 
     desc 'backup', 'Backup all packages to the vault'

@@ -17,8 +17,13 @@ module Yabs
       duplicity type, '--encrypt-key', @encrypt_key, @directory, @remote
     end
 
-    def restore(destination)
-      duplicity 'restore', @remote, destination
+    def restore(destination, options = {})
+      args = []
+      if options[:path]
+        args << '--file-to-restore'
+        args << options[:path]
+      end
+      duplicity 'restore', *args, @remote, destination
     end
 
     def versions
