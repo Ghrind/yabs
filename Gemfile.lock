@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    yabs (0.1.1)
+    yabs (0.1.2)
       command
       table_print
       thor

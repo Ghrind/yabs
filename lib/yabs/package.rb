@@ -38,7 +38,7 @@ module Yabs
       if all_versions.respond_to?(version_index)
         all_versions.send(version_index)
       else
-        all_versions[version_index]
+        all_versions[version_index.to_i]
       end
     end
 

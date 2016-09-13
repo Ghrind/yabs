@@ -16,11 +16,12 @@ module Yabs
       ShowDirectoryHistory.run app.vault, package
     end
 
-    desc 'show', 'List all files of the last version of a package'
+    desc 'show', 'List all files of a given version of a package'
     method_option :package, aliases: %w(-p), type: :string, default: '.'
+    method_option :version, aliases: %W(-v), type: :string, default: 'last'
     def show
       package = app.find_package(options[:package])
-      ShowDirectoryContent.run app.vault, package
+      ShowDirectoryContent.run app.vault, package, version: options[:version]
     end
 
     desc 'restore', 'Restore a whole package to the specified directory'
