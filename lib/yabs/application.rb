@@ -4,9 +4,9 @@ module Yabs
   class Commands < ConsoleApp::Commands
     default_task :index
 
-    desc 'index', 'List all packages in the current vault'
+    desc 'index', 'List all local packages'
     def index
-      ShowIndex.run app.vault, app.packages
+      ShowIndex.run app.vault, app.local_packages
     end
 
     desc 'log', 'Show the versions history of a single package'
@@ -24,7 +24,7 @@ module Yabs
       ShowDirectoryContent.run app.vault, package, version: options[:version]
     end
 
-    desc 'restore', 'Restore a whole package to the specified directory'
+    desc 'restore', 'Restore a package/directory/file to the specified directory'
     method_option :package, aliases: %w(-p), type: :string, default: '.'
     method_option :destination, aliases: %w(-d), type: :string, required: true
     method_option :path, aliases: %w(-P), type: :string
@@ -34,12 +34,12 @@ module Yabs
       RestorePath.run app.vault, package, destination, path: options[:path]
     end
 
-    desc 'backup', 'Backup all packages to the vault'
+    desc 'backup', 'Backup all local packages to the vault'
     method_option :incremental, aliases: %w(-i), type: :boolean
     def backup
       # TODO: First backup should always be full
       type = options[:incremental] ? :incremental : :full
-      BackupAllDirectories.run app.vault, app.packages, type
+      BackupAllDirectories.run app.vault, app.local_packages, type
     end
   end
 
@@ -64,19 +64,23 @@ module Yabs
       @_hostname ||= `hostname`.chomp
     end
 
-    def find_package(directory)
-      directory = File.expand_path(directory)
-      packages.detect { |p| p.directory == directory }.tap do |package|
-        fail "No package found for '#{directory}'" unless package
-      end
+    def find_package(reference)
+      package = find_local_package(reference)
+      package ||= Yabs::Package.new(reference, File.join(vault, reference))
+      package
+    end
+
+    def find_local_package(reference)
+      directory = File.expand_path(reference)
+      local_packages.detect { |p| p.directory == directory }
     end
 
     def vault
       "#{config['vault']['scheme']}#{config['vault']['path']}"
     end
 
-    def packages
-      @_packages ||= directories.map do |directory|
+    def local_packages
+      @_local_packages ||= directories.map do |directory|
         remote = File.join(vault, hostname, directory)
         Yabs::Package.new directory, remote
       end
